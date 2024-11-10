@@ -6,7 +6,7 @@ from abc import ABC
 from bs4 import BeautifulSoup
 from PIL import Image
 from io import BytesIO
-
+from sd_model import generate_image
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -85,7 +85,7 @@ class ImageAdvisor(ABC):
             save_directory = f"images/{image_directory}"
             os.makedirs(save_directory, exist_ok=True)
             save_path = os.path.join(save_directory, f"{img['slide_title']}_1.jpeg")
-            self.save_image(img["obj"], save_path)
+            self.save_image(img["obj"], save_path, img['query'])
             image_pair[img["slide_title"]] = save_path
 
         content_with_images = self.insert_images(markdown_content, image_pair)
@@ -173,7 +173,7 @@ class ImageAdvisor(ABC):
         sorted_images = sorted(image_data, key=lambda x: x["resolution"], reverse=True)
         return sorted_images
 
-    def save_image(self, img, save_path, format="JPEG", quality=85, max_size=1080):
+    def save_image(self, img, save_path, keyword="", format="JPEG", quality=85, max_size=1080, min_size=768):
         """
         保存图像到本地并压缩。
 
@@ -191,6 +191,10 @@ class ImageAdvisor(ABC):
                 new_width = int(width * scaling_factor)
                 new_height = int(height * scaling_factor)
                 img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+            # 尺寸小于指定的最小尺寸，就调用本地的SD模型生成图片
+            if min(width, height) < min_size:
+                img = generate_image(keyword)
 
             if img.mode == "RGBA":
                 format = "PNG"
